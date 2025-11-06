@@ -1,0 +1,208 @@
+# Implementation Plan
+
+- [x] 1. Set up Spring Boot project structure with Spring AI dependencies
+  - Create Maven/Gradle project with Spring Boot 3.x
+  - Add Spring AI dependency for chosen LLM provider (OpenAI)
+  - Add Spring Web dependency for RestTemplate/WebClient
+  - Add Spring Retry and Spring Boot Configuration Processor dependencies
+  - Create package structure: config, model, service, client, scheduler
+  - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
+
+- [x] 2. Implement configuration and data models
+  - [x] 2.1 Create configuration classes
+    - Implement `TriageConfiguration` with `@ConfigurationProperties`
+    - Create nested `GitHub` and `AI` configuration classes
+    - Add validation annotations for required properties
+    - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 5.6_
+  - [x] 2.2 Create domain models
+    - Implement `GitHubIssue` class with all required fields
+    - Create `IssueCategory` enum with four categories
+    - Implement `TriageResult` class with classification details
+    - Add Jackson annotations for JSON serialization
+    - _Requirements: 1.4, 2.2, 2.5, 4.1_
+  - [x] 2.3 Create application.yml configuration file
+    - Define configuration properties with placeholders for environment variables
+    - Configure Spring AI settings for LLM provider
+    - Set up logging levels
+    - Define default schedule cron expression
+    - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
+
+- [x] 3. Implement GitHub API client
+  - [x] 3.1 Create GitHubClient service
+    - Implement method to fetch issues with "pending-triage" label using GitHub REST API
+    - Add authentication using personal access token in request headers
+    - Parse GitHub API JSON responses into `GitHubIssue` objects
+    - Extract issue number, title, body, author, created date, URL, and labels
+    - _Requirements: 1.1, 1.2, 1.4_
+  - [x] 3.2 Implement error handling for GitHub API
+    - Detect and handle authentication errors with descriptive logging
+    - Detect rate limit errors and extract reset time
+    - Implement retry logic with exponential backoff for network timeouts
+    - Return appropriate exit codes for different error types
+    - _Requirements: 1.3, 6.1, 6.4_
+  - [x] 3.3 Handle empty results scenario
+    - Check if no issues are returned from API
+    - Log informational message when no pending-triage issues exist
+    - _Requirements: 1.5_
+
+- [x] 4. Implement AI classification service with Spring AI
+  - [x] 4.1 Create AIClassificationService
+    - Inject Spring AI `ChatClient` or `ChatModel` bean
+    - Implement `classifyIssue` method that returns `TriageResult`
+    - Configure LLM model parameters (temperature, max tokens)
+    - _Requirements: 2.1, 2.2, 5.4_
+  - [x] 4.2 Build classification prompt template
+    - Create prompt that instructs LLM to classify into Bug, Feature Request, Usability, or Question
+    - Include issue title, body, and author in prompt
+    - Request JSON response with category, confidence score, and reasoning
+    - _Requirements: 2.1, 2.2, 2.3, 2.5_
+  - [x] 4.3 Parse and validate LLM classification response
+    - Parse JSON response from LLM
+    - Validate category is one of the four allowed values
+    - Extract confidence score and reasoning
+    - Flag for manual review if confidence is below 70
+    - _Requirements: 2.2, 2.3, 2.4, 2.5_
+  - [x] 4.4 Build response suggestion prompt template
+    - Create category-specific prompt templates for response generation
+    - For Bug: include steps for reproduction verification and info gathering
+    - For Feature Request: include acknowledgment and evaluation criteria
+    - For Usability: include empathy statements and improvement discussion
+    - For Question: include direct answers or documentation pointers
+    - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6_
+  - [x] 4.5 Implement retry logic for LLM failures
+    - Add `@Retryable` annotation with exponential backoff
+    - Retry up to 3 times for service unavailability
+    - Log retry attempts
+    - _Requirements: 6.2, 6.4_
+
+- [x] 5. Implement result persistence service
+  - [x] 5.1 Create ResultPersistenceService
+    - Implement method to save list of `TriageResult` objects
+    - Format results as JSON with triage run metadata
+    - Include timestamp, total issues, and category breakdown summary
+    - _Requirements: 4.1, 4.2, 4.3, 4.4_
+  - [x] 5.2 Implement file writing with error handling
+    - Write JSON output to configured file path
+    - Implement fallback to default location if primary path fails
+    - Log errors for write failures
+    - Handle disk full scenario with critical error logging
+    - _Requirements: 4.2, 4.5, 6.4_
+  - [x] 5.3 Generate summary statistics
+    - Calculate total issue count
+    - Count issues by category
+    - Include processing timestamps
+    - Track failed issues if any
+    - _Requirements: 4.3, 4.4_
+
+- [x] 6. Implement core triage service orchestration
+  - [x] 6.1 Create TriageService
+    - Inject `GitHubClient`, `AIClassificationService`, and `ResultPersistenceService`
+    - Implement `processAllPendingIssues` method as main workflow coordinator
+    - _Requirements: 1.1, 2.1, 3.1, 4.1_
+  - [x] 6.2 Implement single issue processing
+    - Create `processIssue` method that takes a `GitHubIssue`
+    - Call AI classification service
+    - Handle individual issue processing errors
+    - Log errors and continue with remaining issues
+    - _Requirements: 2.1, 3.1, 6.3, 6.4_
+  - [x] 6.3 Orchestrate complete workflow
+    - Fetch all pending-triage issues from GitHub
+    - Process each issue through AI classification
+    - Collect all triage results
+    - Persist results to output file
+    - Log summary statistics
+    - _Requirements: 1.1, 2.1, 3.1, 4.1, 4.3_
+  - [x] 6.4 Implement workflow error handling
+    - Handle GitHub API errors appropriately
+    - Continue processing if individual issues fail
+    - Return appropriate exit codes
+    - _Requirements: 6.1, 6.2, 6.3, 6.5_
+
+- [x] 7. Implement scheduling functionality
+  - [x] 7.1 Create TriageScheduler component
+    - Add `@EnableScheduling` to main application class
+    - Create scheduler class with `@Component` annotation
+    - Inject `TriageService`
+    - _Requirements: 7.1, 7.2_
+  - [x] 7.2 Configure scheduled execution
+    - Add `@Scheduled` annotation with cron expression from configuration
+    - Implement `executeTriage` method that calls `TriageService`
+    - Use `fixedDelay` or locking mechanism to prevent concurrent executions
+    - Log start and end time of each execution
+    - _Requirements: 7.2, 7.3, 7.4, 7.5_
+
+- [x] 8. Add application startup and configuration validation
+  - [x] 8.1 Create main application class
+    - Implement Spring Boot main class with `@SpringBootApplication`
+    - Enable configuration properties scanning
+    - Enable retry functionality
+    - _Requirements: 5.1_
+  - [x] 8.2 Implement configuration validation
+    - Add `@PostConstruct` method to validate required properties
+    - Check for missing GitHub token, repository details, and LLM configuration
+    - Log descriptive error messages for missing properties
+    - Terminate with appropriate exit code if validation fails
+    - _Requirements: 5.6, 6.4_
+
+- [x] 9. Add logging and monitoring
+  - [x] 9.1 Configure logging framework
+    - Set up SLF4J with Logback
+    - Configure log levels in application.yml
+    - Add structured logging for key events
+    - _Requirements: 1.3, 1.5, 4.3, 6.4, 7.5_
+  - [x] 9.2 Add comprehensive logging throughout application
+    - Log GitHub API calls and responses
+    - Log AI classification requests and results
+    - Log errors with full context
+    - Log summary statistics after each run
+    - _Requirements: 1.3, 1.5, 4.3, 6.1, 6.4, 7.3, 7.5_
+
+- [ ]* 10. Create unit tests for core components
+  - [ ]* 10.1 Write tests for AIClassificationService
+    - Test prompt construction with various issue formats
+    - Test JSON parsing of LLM responses
+    - Test confidence threshold logic for manual review flagging
+    - Mock Spring AI ChatClient
+  - [ ]* 10.2 Write tests for GitHubClient
+    - Mock GitHub API responses using MockRestServiceServer
+    - Test authentication header injection
+    - Test error handling for rate limits and auth failures
+    - Test empty results scenario
+  - [ ]* 10.3 Write tests for ResultPersistenceService
+    - Test JSON formatting
+    - Test file write operations with temporary files
+    - Test fallback behavior for write failures
+    - Test summary statistics generation
+  - [ ]* 10.4 Write tests for TriageService
+    - Test workflow orchestration with mocked dependencies
+    - Test error handling for individual issue failures
+    - Test summary statistics calculation
+
+- [ ]* 11. Create integration tests
+  - [ ]* 11.1 Write end-to-end integration test
+    - Use WireMock to mock GitHub API
+    - Use test LLM responses or mock Spring AI
+    - Verify complete workflow from fetch to persistence
+    - Validate output file format
+  - [ ]* 11.2 Write Spring AI integration test
+    - Test with actual LLM using test API key
+    - Verify classifications are reasonable
+    - Test retry behavior with simulated failures
+
+- [x] 12. Create README and documentation
+  - [x] 12.1 Write README.md
+    - Document project purpose and features
+    - Include prerequisites and setup instructions
+    - Provide configuration examples
+    - Add build and run instructions
+    - Document environment variables
+    - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
+  - [x] 12.2 Add example configuration files
+    - Create example application.yml with placeholders
+    - Create .env.example file for environment variables
+    - Document minimum required GitHub token permissions
+    - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
+  - [ ]* 12.3 Create Docker deployment files
+    - Write Dockerfile for containerized deployment
+    - Create docker-compose.yml example
+    - Document Docker deployment steps

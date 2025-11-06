@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub Issue Triage Agent</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🤖 GitHub Issue Triage Agent</h1>
+            <p class="subtitle">AI-powered issue classification for kirodotdev/Kiro</p>
+            <nav style="margin-top: 16px;">
+                <a href="categorize.html" class="btn btn-primary" style="text-decoration: none; display: inline-block;">
+                    🔍 Bulk Categorization
+                </a>
+            </nav>
+        </header>
+
+        <div class="controls">
+            <div class="controls-left">
+                <button id="refreshBtn" class="btn btn-primary">
+                    <span class="icon">🔄</span> Refresh Issues
+                </button>
+                <button id="buildKbBtn" class="btn btn-secondary">
+                    <span class="icon">🧠</span> Build Knowledge Base
+                </button>
+                <button id="kbStatusBtn" class="btn btn-secondary">
+                    <span class="icon">📊</span> KB Status
+                </button>
+                <div class="model-selector">
+                    <label for="modelSelect">🤖 AI Model:</label>
+                    <select id="modelSelect" class="model-dropdown">
+                        <option value="anthropic.claude-3-5-haiku-20241022-v1:0">Claude Haiku 3.5</option>
+                        <option value="anthropic.claude-3-5-sonnet-20241022-v2:0">Claude Sonnet 3.5</option>
+                        <option value="us.anthropic.claude-sonnet-4-5-v2:0">Claude Sonnet 4.5</option>
+                    </select>
+                </div>
+            </div>
+            <span id="issueCount" class="issue-count"></span>
+        </div>
+        
+        <div id="statistics" class="statistics-panel"></div>
+        
+        <div id="kbStatus" class="kb-status" style="display: none;"></div>
+
+        <div id="loading" class="loading" style="display: none;">
+            <div class="spinner"></div>
+            <p>Loading issues...</p>
+        </div>
+
+        <div id="issuesList" class="issues-list"></div>
+        
+        <div id="pagination" class="pagination" style="display: none;">
+            <button id="prevBtn" class="btn btn-secondary">← Previous</button>
+            <span id="pageInfo" class="page-info"></span>
+            <button id="nextBtn" class="btn btn-secondary">Next →</button>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

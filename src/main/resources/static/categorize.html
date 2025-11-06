@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bulk Issue Categorization - GitHub Issue Triage Agent</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .category-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .category-bug { background-color: #dc3545; color: white; }
+        .category-feature { background-color: #28a745; color: white; }
+        .category-question { background-color: #17a2b8; color: white; }
+        .category-usability { background-color: #ffc107; color: #333; }
+        
+        .issue-card {
+            background: white;
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            padding: 16px;
+            margin-bottom: 12px;
+            transition: box-shadow 0.2s;
+        }
+        
+        .issue-card:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .issue-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 8px;
+        }
+        
+        .issue-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #0366d6;
+            text-decoration: none;
+            flex: 1;
+            margin-right: 12px;
+        }
+        
+        .issue-title:hover {
+            text-decoration: underline;
+        }
+        
+        .issue-number {
+            color: #586069;
+            font-size: 14px;
+            white-space: nowrap;
+        }
+        
+        .issue-meta {
+            display: flex;
+            gap: 16px;
+            font-size: 13px;
+            color: #586069;
+            margin-top: 8px;
+        }
+        
+        .confidence-bar {
+            width: 100%;
+            height: 6px;
+            background: #e1e4e8;
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 8px;
+        }
+        
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #28a745, #ffc107, #dc3545);
+            transition: width 0.3s;
+        }
+        
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            margin: 24px 0;
+        }
+        
+        .pagination button {
+            padding: 8px 16px;
+            border: 1px solid #e1e4e8;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .pagination button:hover:not(:disabled) {
+            background: #f6f8fa;
+        }
+        
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .pagination-info {
+            font-size: 14px;
+            color: #586069;
+        }
+        
+        .filter-bar {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .filter-button {
+            padding: 8px 16px;
+            border: 2px solid #e1e4e8;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+        
+        .filter-button:hover {
+            border-color: #0366d6;
+        }
+        
+        .filter-button.active {
+            background: #0366d6;
+            color: white;
+            border-color: #0366d6;
+        }
+        
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #0366d6;
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .summary-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        
+        .summary-card {
+            background: white;
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            padding: 16px;
+            text-align: center;
+        }
+        
+        .summary-card h3 {
+            margin: 0 0 8px 0;
+            font-size: 14px;
+            color: #586069;
+            text-transform: uppercase;
+        }
+        
+        .summary-card .count {
+            font-size: 32px;
+            font-weight: 700;
+            color: #24292e;
+        }
+        
+        .search-section {
+            background: white;
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+        
+        .search-section h2 {
+            margin: 0 0 16px 0;
+            font-size: 18px;
+            color: #24292e;
+        }
+        
+        .search-container {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .search-container input {
+            flex: 1;
+            min-width: 200px;
+            padding: 10px 14px;
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            font-size: 14px;
+        }
+        
+        .search-container input:focus {
+            outline: none;
+            border-color: #0366d6;
+            box-shadow: 0 0 0 3px rgba(3, 102, 214, 0.1);
+        }
+        
+        .search-result {
+            background: white;
+            border: 1px solid #e1e4e8;
+            border-radius: 6px;
+            padding: 20px;
+            margin-bottom: 24px;
+        }
+        
+        .search-result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 16px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid #e1e4e8;
+        }
+        
+        .search-result-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #0366d6;
+            text-decoration: none;
+            flex: 1;
+            margin-right: 12px;
+        }
+        
+        .search-result-title:hover {
+            text-decoration: underline;
+        }
+        
+        .search-result-section {
+            margin-bottom: 16px;
+        }
+        
+        .search-result-section h3 {
+            font-size: 14px;
+            font-weight: 600;
+            color: #586069;
+            margin: 0 0 8px 0;
+            text-transform: uppercase;
+        }
+        
+        .search-result-section p {
+            margin: 0;
+            color: #24292e;
+            line-height: 1.5;
+        }
+        
+        .label-tag {
+            display: inline-block;
+            padding: 4px 10px;
+            background: #f1f8ff;
+            border: 1px solid #c8e1ff;
+            border-radius: 12px;
+            font-size: 12px;
+            color: #0366d6;
+            margin-right: 6px;
+            margin-bottom: 6px;
+        }
+        
+        .error-message {
+            background: #ffeef0;
+            border: 1px solid #fdb8c0;
+            border-radius: 6px;
+            padding: 16px;
+            margin-bottom: 24px;
+            color: #d73a49;
+        }
+        
+        .error-message strong {
+            display: block;
+            margin-bottom: 4px;
+        }
+        
+        .search-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid #e1e4e8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔍 Bulk Issue Categorization</h1>
+            <p>Automatically categorize the first 10 pending-triage issues and update their labels</p>
+            <nav style="margin-top: 16px;">
+                <a href="index.html" style="color: #0366d6; text-decoration: none;">← Back to Main Dashboard</a>
+            </nav>
+        </header>
+
+        <div class="summary-cards" id="summaryCards">
+            <div class="summary-card">
+                <h3>Total Issues</h3>
+                <div class="count" id="totalCount">-</div>
+            </div>
+            <div class="summary-card">
+                <h3>Bugs</h3>
+                <div class="count" id="bugCount">-</div>
+            </div>
+            <div class="summary-card">
+                <h3>Features</h3>
+                <div class="count" id="featureCount">-</div>
+            </div>
+            <div class="summary-card">
+                <h3>Questions</h3>
+                <div class="count" id="questionCount">-</div>
+            </div>
+            <div class="summary-card">
+                <h3>Usability</h3>
+                <div class="count" id="usabilityCount">-</div>
+            </div>
+        </div>
+
+        <div class="search-section">
+            <h2>🔍 Search by Issue ID</h2>
+            <div class="search-container">
+                <input type="number" 
+                       id="issueIdInput" 
+                       placeholder="Enter issue number (e.g., 123)" 
+                       min="1"
+                       onkeypress="if(event.key === 'Enter') searchIssue()">
+                <button class="btn btn-primary" onclick="searchIssue()">
+                    🔍 Search & Triage
+                </button>
+                <button class="btn btn-secondary" onclick="clearSearch()">
+                    Clear
+                </button>
+            </div>
+        </div>
+
+        <div id="searchError" class="error-message" style="display: none;"></div>
+        <div id="searchResult" class="search-result" style="display: none;"></div>
+
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 12px;">
+                <h2>Categorized Issues</h2>
+                <div style="display: flex; gap: 12px;">
+                    <button class="btn btn-secondary" onclick="startQuickTriage()">
+                        ⚡ Quick Triage (Title Only)
+                    </button>
+                    <button class="btn btn-primary" onclick="startCategorization()">
+                        🔍 Full Categorization
+                    </button>
+                </div>
+            </div>
+
+            <div class="filter-bar" id="filterBar">
+                <button class="filter-button active" data-category="all" onclick="filterByCategory('all')">
+                    All
+                </button>
+                <button class="filter-button" data-category="BUG" onclick="filterByCategory('BUG')">
+                    Bugs
+                </button>
+                <button class="filter-button" data-category="FEATURE_REQUEST" onclick="filterByCategory('FEATURE_REQUEST')">
+                    Features
+                </button>
+                <button class="filter-button" data-category="QUESTION" onclick="filterByCategory('QUESTION')">
+                    Questions
+                </button>
+                <button class="filter-button" data-category="USABILITY" onclick="filterByCategory('USABILITY')">
+                    Usability
+                </button>
+            </div>
+
+            <div id="issuesList"></div>
+
+            <div class="pagination" id="pagination">
+                <button id="prevBtn" onclick="previousPage()" disabled>Previous</button>
+                <span class="pagination-info" id="pageInfo">Page 1</span>
+                <button id="nextBtn" onclick="nextPage()">Next</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+        <div class="loading-spinner"></div>
+        <p style="margin-top: 16px; font-size: 16px; color: #24292e;">
+            Categorizing issues... <span id="progressText">0/0</span>
+        </p>
+    </div>
+
+    <script src="categorize.js"></script>
+</body>
+</html>

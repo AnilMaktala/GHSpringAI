@@ -1,0 +1,35 @@
+triage:
+  github:
+    owner: ${GITHUB_OWNER:kirodotdev}
+    repo: ${GITHUB_REPO:Kiro}
+    token: ${GITHUB_TOKEN:}
+  ai:
+    provider: bedrock
+    model: ${AI_MODEL:anthropic.claude-3-5-sonnet-20241022-v2:0}
+    temperature: 0.3
+    max-retries: 3
+  output-path: ${OUTPUT_PATH:./triage-results.json}
+  schedule: ${TRIAGE_SCHEDULE:0 0 */6 * * *}
+  run-on-startup: ${RUN_ON_STARTUP:false}
+
+spring:
+  ai:
+    bedrock:
+      aws:
+        region: ${AWS_REGION:us-west-2}
+        profile: ${AWS_PROFILE:migration-west-2}
+      anthropic3:
+        chat:
+          enabled: true
+          model: ${triage.ai.model}
+          options:
+            temperature: ${triage.ai.temperature}
+            max-tokens: 2000
+
+logging:
+  level:
+    com.example.triage: INFO
+    org.springframework.ai: DEBUG
+    org.springframework.web.client: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"

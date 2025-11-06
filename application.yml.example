@@ -1,0 +1,82 @@
+# Example application.yml configuration
+# Copy this file to src/main/resources/application.yml and customize as needed
+
+triage:
+  github:
+    # GitHub repository owner (organization or username)
+    owner: ${GITHUB_OWNER:kirodotdev}
+    
+    # GitHub repository name
+    repo: ${GITHUB_REPO:Kiro}
+    
+    # GitHub Personal Access Token
+    # Required scopes: public_repo (public repos) or repo (private repos)
+    token: ${GITHUB_TOKEN:}
+    
+  ai:
+    # AI provider (currently supports: bedrock)
+    provider: bedrock
+    
+    # Model to use for classification
+    # Options: 
+    #   - us.anthropic.claude-sonnet-4-5-v2:0 (latest, most capable)
+    #   - anthropic.claude-3-5-sonnet-20241022-v2:0
+    #   - anthropic.claude-3-sonnet-20240229-v1:0
+    #   - anthropic.claude-3-haiku-20240307-v1:0
+    model: ${AI_MODEL:us.anthropic.claude-sonnet-4-5-v2:0}
+    
+    # Temperature for AI responses (0.0 - 1.0)
+    # Lower = more deterministic, Higher = more creative
+    temperature: 0.3
+    
+    # Maximum retry attempts for LLM failures
+    max-retries: 3
+    
+  # Output file path for triage results
+  output-path: ${OUTPUT_PATH:./triage-results.json}
+  
+  # Cron expression for scheduled execution
+  # Format: second minute hour day month weekday
+  # Examples:
+  #   "0 0 */6 * * *"     - Every 6 hours
+  #   "0 0 */3 * * *"     - Every 3 hours  
+  #   "0 0 9 * * MON-FRI" - 9 AM on weekdays
+  #   "-"                 - Disable scheduling (for manual execution)
+  schedule: ${TRIAGE_SCHEDULE:0 0 */6 * * *}
+
+spring:
+  ai:
+    bedrock:
+      aws:
+        # AWS region where Bedrock is available
+        region: ${AWS_REGION:us-west-2}
+        
+        # AWS Profile (recommended - uses ~/.aws/credentials)
+        profile: ${AWS_PROFILE:migration-west-2}
+        
+        # Alternative: Explicit credentials (uncomment if not using profile)
+        # access-key: ${AWS_ACCESS_KEY_ID:}
+        # secret-key: ${AWS_SECRET_ACCESS_KEY:}
+      
+      anthropic3:
+        chat:
+          enabled: true
+          model: ${triage.ai.model}
+          options:
+            temperature: ${triage.ai.temperature}
+            max-tokens: 2000
+
+logging:
+  level:
+    # Application logging level
+    com.example.triage: INFO
+    
+    # Spring AI logging (useful for debugging)
+    org.springframework.ai: DEBUG
+    
+    # HTTP client logging (useful for debugging GitHub API calls)
+    org.springframework.web.client: DEBUG
+    
+  pattern:
+    # Console log pattern
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
